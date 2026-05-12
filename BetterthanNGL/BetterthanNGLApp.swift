@@ -8,10 +8,14 @@
 import SwiftUI
 
 @main
+@MainActor
 struct BetterthanNGLApp: App {
+    @StateObject private var auth = AuthViewModel()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(auth)
         }
     }
 }

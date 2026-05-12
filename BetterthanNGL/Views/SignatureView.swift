@@ -35,13 +35,14 @@ struct SignatureView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical)
                     }
-                    .listRowBackground(Color.clear)
+                    .listRowBackground(AnyView(Rectangle().fill(.ultraThinMaterial)))
 
                     Section {
                         Label("Vérifié par \(verificationType)", systemImage: "checkmark.shield.fill")
                             .font(.callout)
                             .foregroundStyle(.green)
                     }
+                    .listRowBackground(AnyView(Rectangle().fill(.ultraThinMaterial)))
 
                     Section("Zone de signature") {
                         ZStack(alignment: .topLeading) {
@@ -76,9 +77,9 @@ struct SignatureView: View {
                                     .padding(.horizontal, 32)
                                     .padding(.bottom, 60)
                             }
-                        }
-                        .frame(height: 300)
-                    }
+                            }
+                            .frame(height: 300)
+                            }
 
                     Section("Informations de signature") {
                         LabeledContent("Session", value: session.title)
@@ -86,6 +87,7 @@ struct SignatureView: View {
                         LabeledContent("Horaire", value: "\(session.startTime) - \(session.endTime)")
                         LabeledContent("Méthode", value: verificationType)
                     }
+                    .listRowBackground(AnyView(Rectangle().fill(.ultraThinMaterial)))
 
                     Section {
                         HStack(spacing: 12) {
@@ -93,19 +95,19 @@ struct SignatureView: View {
                                 Label("Effacer", systemImage: "trash")
                                     .frame(maxWidth: .infinity)
                             }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(GlassButtonStyle())
                             .controlSize(.large)
 
                             Button(action: validateSignature) {
                                 Label("Valider", systemImage: "checkmark.circle.fill")
                                     .frame(maxWidth: .infinity)
                             }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(GlassButtonStyle())
                             .controlSize(.large)
                             .disabled(!isDrawing)
                         }
                     }
-                    .listRowBackground(Color.clear)
+                    .listRowBackground(AnyView(Rectangle().fill(.ultraThinMaterial)))
                 }
             }
             .navigationTitle("Signature")

@@ -35,7 +35,7 @@ struct SignatureOptionsView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical)
                 }
-                .listRowBackground(Color.clear)
+                .listRowBackground(AnyView(Rectangle().fill(.ultraThinMaterial)))
 
                 Section("Méthodes de signature") {
                     Button(action: { showCodeInput = true }) {
@@ -53,6 +53,7 @@ struct SignatureOptionsView: View {
                                 .foregroundStyle(.blue)
                         }
                     }
+                    .buttonStyle(GlassButtonStyle())
 
                     Button(action: { showQRScanner = true }) {
                         Label {
@@ -79,6 +80,7 @@ struct SignatureOptionsView: View {
                                 .foregroundStyle(.blue)
                         }
                     }
+                    .buttonStyle(GlassButtonStyle())
 
                     Button(action: { showLocationCheck = true }) {
                         Label {
@@ -105,7 +107,9 @@ struct SignatureOptionsView: View {
                                 .foregroundStyle(.blue)
                         }
                     }
+                    .buttonStyle(GlassButtonStyle())
                 }
+                .listRowBackground(AnyView(Rectangle().fill(.ultraThinMaterial)))
 
                 Section("Informations de la session") {
                     LabeledContent {
@@ -132,6 +136,7 @@ struct SignatureOptionsView: View {
                         Label("Formateur", systemImage: "person.fill")
                     }
                 }
+                .listRowBackground(AnyView(Rectangle().fill(.ultraThinMaterial)))
             }
             .navigationTitle("Signature")
             .navigationBarTitleDisplayMode(.inline)

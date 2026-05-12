@@ -6,11 +6,27 @@
 import SwiftUI
 
 struct SessionsListView: View {
+    @EnvironmentObject var auth: AuthViewModel
     @State private var sessions = Session.sampleSessions
     @State private var selectedSession: Session?
     @State private var selectedFilter = 0
 
     private let filters = ["Aujourd'hui", "Cette semaine", "Toutes"]
+
+    private var filteredSessions: [Session] {
+        let cal = Calendar.current
+        switch selectedFilter {
+        case 0: // Today
+            return sessions.filter { cal.isDateInToday($0.date) }
+        case 1: // This week
+            if let interval = cal.dateInterval(of: .weekOfYear, for: Date()) {
+                return sessions.filter { $0.date >= interval.start && $0.date <= interval.end }
+            }
+            return sessions
+        default:
+            return sessions
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -22,7 +38,7 @@ struct SessionsListView: View {
                                 Text("Bonjour,")
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
-                                Text("Étudiant M1")
+                                Text(auth.username.isEmpty ? "Étudiant M1" : auth.username)
                                     .font(.title2)
                                     .fontWeight(.semibold)
                             }
@@ -42,7 +58,11 @@ struct SessionsListView: View {
                             StatItem(value: "2", label: "En attente", icon: "clock.circle", color: .orange)
                         }
                     }
-                    .padding(.vertical, 8)
+                    .padding(.all, 16)
+                    // Use a white card for the greeting/stats block to keep visual consistency
+                    .background(AnyView(RoundedRectangle(cornerRadius: 12).fill(Color.white)))
+                    .cornerRadius(12)
+                    .listRowInsets(EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12))
                 }
 
                 Section {
@@ -55,7 +75,7 @@ struct SessionsListView: View {
                 }
 
                 Section("Sessions") {
-                    ForEach(sessions) { session in
+                    ForEach(filteredSessions) { session in
                         Button(action: { selectedSession = session }) {
                             SessionRow(session: session)
                         }
@@ -66,13 +86,43 @@ struct SessionsListView: View {
             .navigationTitle("Mes sessions")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: {}) {
+                    Menu {
+                        Button("Déconnexion", role: .destructive) {
+                            auth.logout()
+                        }
+                    } label: {
                         Image(systemName: "person.circle")
                     }
                 }
             }
             .sheet(item: $selectedSession) { session in
                 SignatureOptionsView(session: session)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .didCompleteSignature)) { _ in
+                // Close the sheet and any child fullScreenCovers by clearing the selected session
+                selectedSession = nil
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .didSignSession)) { note in
+                guard let info = note.userInfo,
+                      let idString = info["sessionID"] as? String,
+                      let id = UUID(uuidString: idString),
+                      let idx = sessions.firstIndex(where: { $0.id == id })
+                else { return }
+
+                // Simple strategy: mark the first notSigned slot (morning then afternoon) as signed
+                if sessions[idx].morningStatus == .notSigned {
+                    sessions[idx].morningStatus = .signed
+                } else if sessions[idx].afternoonStatus == .notSigned {
+                    sessions[idx].afternoonStatus = .signed
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .didCompleteSignature)) { _ in
+                // Close the sheet and any child fullScreenCovers by clearing the selected session
+                selectedSession = nil
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .didCompleteSignature)) { _ in
+                // Close the sheet and any child fullScreenCovers by clearing the selected session
+                selectedSession = nil
             }
         }
     }
@@ -101,4 +151,5 @@ struct StatItem: View {
 
 #Preview {
     SessionsListView()
+        .environmentObject(AuthViewModel())
 }

@@ -8,11 +8,15 @@ import SwiftUI
 struct LoginView: View {
     @State private var email = ""
     @State private var password = ""
-    @Binding var isAuthenticated: Bool
+    @EnvironmentObject var auth: AuthViewModel
 
     var body: some View {
         NavigationStack {
-            Form {
+            ZStack {
+                LinearGradient(colors: [Color(.systemIndigo), Color(.systemBlue)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    .ignoresSafeArea()
+
+                Form {
                 Section {
                     VStack(spacing: 24) {
                         Image(systemName: "signature")
@@ -20,7 +24,7 @@ struct LoginView: View {
                             .foregroundStyle(.blue)
 
                         VStack(spacing: 8) {
-                            Text("Signature")
+                            Text("BetterThanNGL")
                                 .font(.largeTitle)
                                 .fontWeight(.bold)
 
@@ -34,9 +38,13 @@ struct LoginView: View {
                 } header: {
                     EmptyView()
                 }
-                .listRowBackground(Color.clear)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                // use the reusable glass card to get a more authentic liquid glass appearance
+                .glassCard(cornerRadius: 16)
+                .shadow(color: Color.black.opacity(0.12), radius: 20, x: 0, y: 8)
 
-                Section("Connexion") {
+                Section(header: Text("Connexion").font(.headline).foregroundStyle(.white)) {
                     TextField("Identifiant école", text: $email)
                         .textContentType(.emailAddress)
                         .keyboardType(.emailAddress)
@@ -55,42 +63,42 @@ struct LoginView: View {
                         Label("Se connecter", systemImage: "arrow.right.circle.fill")
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(GlassButtonStyle())
                     .controlSize(.large)
-                    .disabled(email.isEmpty || password.isEmpty)
 
                     Button(action: {}) {
                         Label("Connexion par lien magique", systemImage: "envelope.circle")
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(GlassButtonStyle())
                     .controlSize(.large)
                 }
-                .listRowBackground(Color.clear)
 
                 Section {
                     VStack(spacing: 4) {
                         Text("Version 1.0.0")
                             .font(.caption)
-                        Text("Projet pédagogique Master 1")
+                        Text("Esteban PAGIS - Paul MONTAGNAC - Corentin ALLALOU")
                             .font(.caption2)
                     }
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
                 }
-                .listRowBackground(Color.clear)
+                // Info block should also be white to match the rest of the login card blocks
+                .listRowBackground(AnyView(RoundedRectangle(cornerRadius: 12).fill(Color.white)))
             }
             .scrollContentBackground(.hidden)
+            }
         }
     }
 
     private func login() {
-        withAnimation {
-            isAuthenticated = true
-        }
+        // Use the AuthViewModel to perform a fake login - accepts any credentials.
+        auth.login(username: email.isEmpty ? "Utilisateur" : email, password: password)
     }
 }
 
 #Preview {
-    LoginView(isAuthenticated: .constant(false))
+    LoginView()
+        .environmentObject(AuthViewModel())
 }

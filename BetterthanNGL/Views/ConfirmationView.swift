@@ -80,20 +80,17 @@ struct ConfirmationView: View {
                 Spacer()
 
                 VStack(spacing: 12) {
-                    Button(action: { dismiss() }) {
+                    Button(action: {
+                        // notify app to return to home (will dismiss sheets)
+                        NotificationCenter.default.post(name: .didCompleteSignature, object: nil)
+                        dismiss()
+                    }) {
                         Label("Retour à l'accueil", systemImage: "house.fill")
                             .frame(maxWidth: .infinity)
                             .fontWeight(.semibold)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.white)
-                    .foregroundStyle(.green)
+                    .buttonStyle(GlassButtonStyle())
                     .controlSize(.large)
-
-                    Button(action: {}) {
-                        Label("Partager la confirmation", systemImage: "square.and.arrow.up")
-                    }
-                    .foregroundStyle(.white)
                 }
                 .padding()
                 .opacity(showDetails ? 1 : 0)
@@ -110,7 +107,11 @@ struct ConfirmationView: View {
                 }
             }
 
+            // Notify that the session has been signed (so list can update)
+            NotificationCenter.default.post(name: .didSignSession, object: nil, userInfo: ["sessionID": session.id.uuidString])
+
             DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+                NotificationCenter.default.post(name: .didCompleteSignature, object: nil)
                 dismiss()
             }
         }

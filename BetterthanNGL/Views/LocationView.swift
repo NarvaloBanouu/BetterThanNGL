@@ -5,17 +5,21 @@
 
 import SwiftUI
 import MapKit
+import CoreLocation
 
 struct LocationView: View {
     let session: Session
     @Environment(\.dismiss) var dismiss
     @State private var isCheckingLocation = false
+    @State private var isRotating = false
     @State private var locationStatus: LocationStatus = .checking
     @State private var showSignature = false
     @State private var region = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 48.8566, longitude: 2.3522),
+        // EPITA - Kremlin Bicetre (requested campus base)
+        center: CLLocationCoordinate2D(latitude: 48.81570782118537, longitude: 2.36299749714027),
         span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
     )
+    @StateObject private var locationManager = LocationManager()
 
     enum LocationStatus {
         case checking, verified, failed, tooFar
@@ -89,8 +93,8 @@ struct LocationView: View {
                                         .trim(from: 0, to: 0.7)
                                         .stroke(locationStatus.color, lineWidth: 4)
                                         .frame(width: 80, height: 80)
-                                        .rotationEffect(.degrees(isCheckingLocation ? 360 : 0))
-                                        .animation(.linear(duration: 1.0).repeatForever(autoreverses: false), value: isCheckingLocation)
+                                        .rotationEffect(.degrees(isRotating ? 360 : 0))
+                                        .animation(.linear(duration: 1.0).repeatForever(autoreverses: false), value: isRotating)
                                 }
 
                                 Image(systemName: locationStatus.icon)
@@ -161,6 +165,25 @@ struct LocationView: View {
             .onAppear {
                 checkLocation()
             }
+            .onReceive(locationManager.$location) { loc in
+                guard let loc = loc else { return }
+                // Update region to user position
+                withAnimation {
+                    region.center = loc.coordinate
+                }
+                // Evaluate distance to target: use the EPITA campus anchor requested by the user
+                let target = CLLocation(latitude: 48.81570782118537, longitude: 2.36299749714027)
+                let distance = loc.distance(from: target)
+                withAnimation {
+                    if distance <= 50 {
+                        locationStatus = .verified
+                    } else {
+                        locationStatus = .tooFar
+                    }
+                    isCheckingLocation = false
+                    isRotating = false
+                }
+            }
             .fullScreenCover(isPresented: $showSignature) {
                 SignatureView(session: session, verificationType: "Géolocalisation")
             }
@@ -170,11 +193,19 @@ struct LocationView: View {
     private func checkLocation() {
         locationStatus = .checking
         isCheckingLocation = true
+        // start rotation animation
+        isRotating = true
+        // Request a single location update from the helper
+        locationManager.requestLocation()
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            withAnimation {
-                locationStatus = .verified
-                isCheckingLocation = false
+        // Fallback: if no location after 4 seconds, mark as failed
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+            if locationManager.location == nil {
+                withAnimation {
+                    locationStatus = .failed
+                    isCheckingLocation = false
+                    isRotating = false
+                }
             }
         }
     }

@@ -4,6 +4,8 @@
 //
 
 import SwiftUI
+import AVFoundation
+import UIKit
 
 struct QRCodeScannerView: View {
     let session: Session
@@ -11,6 +13,7 @@ struct QRCodeScannerView: View {
     @State private var isScanning = false
     @State private var showSignature = false
     @State private var animateScanLine = false
+    @State private var torchOn = false
 
     var body: some View {
         NavigationStack {
@@ -18,52 +21,64 @@ struct QRCodeScannerView: View {
                 Color.black.ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .aspectRatio(3/4, contentMode: .fit)
-                        .overlay {
-                            if !isScanning {
-                                Image(systemName: "qrcode")
-                                    .font(.system(size: 120))
-                                    .foregroundStyle(.white.opacity(0.8))
+                    ZStack {
+                        // Camera preview when scanning, otherwise placeholder
+                        if isScanning {
+                            CameraScannerView { code in
+                                // Found a QR code -> proceed to signature
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                isScanning = false
+                                animateScanLine = false
+                                showSignature = true
                             }
-                        }
-                        .overlay {
-                            VStack {
-                                Spacer()
-
-                                ZStack {
-                                    Rectangle()
-                                        .fill(Color.black.opacity(0.5))
-                                        .frame(height: 400)
-                                        .overlay {
-                                            RoundedRectangle(cornerRadius: 24)
-                                                .frame(width: 280, height: 280)
-                                                .blendMode(.destinationOut)
-                                        }
-
-                                    ScanFrame()
-                                        .frame(width: 280, height: 280)
-
-                                    if isScanning {
-                                        Rectangle()
-                                            .fill(
-                                                LinearGradient(
-                                                    colors: [.orange.opacity(0), .orange.opacity(0.8), .orange.opacity(0)],
-                                                    startPoint: .top,
-                                                    endPoint: .bottom
-                                                )
-                                            )
-                                            .frame(width: 280, height: 4)
-                                            .offset(y: animateScanLine ? 140 : -140)
-                                            .animation(.linear(duration: 2.0).repeatForever(autoreverses: true), value: animateScanLine)
-                                    }
+                            .aspectRatio(3/4, contentMode: .fit)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        } else {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.3))
+                                .aspectRatio(3/4, contentMode: .fit)
+                                .overlay {
+                                    Image(systemName: "qrcode")
+                                        .font(.system(size: 120))
+                                        .foregroundStyle(.white.opacity(0.8))
                                 }
-
-                                Spacer()
-                            }
                         }
-                        .compositingGroup()
+
+                        // Overlay scan frame + animated line
+                        VStack {
+                            Spacer()
+
+                            ZStack {
+                                Rectangle()
+                                    .fill(Color.black.opacity(0.5))
+                                    .frame(height: 400)
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: 24)
+                                            .frame(width: 280, height: 280)
+                                            .blendMode(.destinationOut)
+                                    }
+
+                                ScanFrame()
+                                    .frame(width: 280, height: 280)
+
+                                if isScanning {
+                                    Rectangle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [.orange.opacity(0), .orange.opacity(0.8), .orange.opacity(0)],
+                                                startPoint: .top,
+                                                endPoint: .bottom
+                                            )
+                                        )
+                                        .frame(width: 280, height: 4)
+                                        .offset(y: animateScanLine ? 140 : -140)
+                                        .animation(.linear(duration: 2.0).repeatForever(autoreverses: true), value: animateScanLine)
+                                }
+                            }
+
+                            Spacer()
+                        }
+                    }
 
                     VStack(spacing: 24) {
                         Text(isScanning ? "Scannez le QR Code" : "Prêt à scanner")
@@ -82,17 +97,14 @@ struct QRCodeScannerView: View {
                                 Label("Commencer le scan", systemImage: "camera.fill")
                                     .fontWeight(.semibold)
                             }
-                            .buttonStyle(.borderedProminent)
-                            .tint(.white)
-                            .foregroundStyle(.blue)
+                            .buttonStyle(GlassButtonStyle())
                             .controlSize(.large)
                         } else {
                             Button(action: simulateScan) {
                                 Label("Simuler un scan (démo)", systemImage: "checkmark.circle.fill")
                                     .fontWeight(.semibold)
                             }
-                            .buttonStyle(.borderedProminent)
-                            .tint(.green)
+                            .buttonStyle(GlassButtonStyle())
                             .controlSize(.large)
                         }
 
@@ -107,7 +119,7 @@ struct QRCodeScannerView: View {
                     }
                     .padding(.vertical, 32)
                     .frame(maxWidth: .infinity)
-                    .background(.black.gradient)
+                    .background(AnyView(RoundedRectangle(cornerRadius: 12).fill(.ultraThinMaterial)))
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -118,8 +130,8 @@ struct QRCodeScannerView: View {
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: {}) {
-                        Image(systemName: "flashlight.off.fill")
+                    Button(action: toggleTorch) {
+                        Image(systemName: torchOn ? "flashlight.on.fill" : "flashlight.off.fill")
                             .foregroundStyle(.white)
                     }
                 }
@@ -131,9 +143,53 @@ struct QRCodeScannerView: View {
     }
 
     private func startScanning() {
-        withAnimation {
-            isScanning = true
-            animateScanLine = true
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        switch status {
+        case .authorized:
+            // If there's no camera (simulator), fallback to demo scan
+            if AVCaptureDevice.default(for: .video) == nil {
+                simulateScan()
+                return
+            }
+
+            withAnimation {
+                isScanning = true
+                animateScanLine = true
+            }
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                DispatchQueue.main.async {
+                    if granted {
+                        withAnimation {
+                            isScanning = true
+                            animateScanLine = true
+                        }
+                    } else {
+                        // Fallback to demo scan if camera access denied
+                        simulateScan()
+                    }
+                }
+            }
+        default:
+            // denied / restricted
+            simulateScan()
+        }
+    }
+
+    private func toggleTorch() {
+        guard let device = AVCaptureDevice.default(for: .video), device.hasTorch else { return }
+        do {
+            try device.lockForConfiguration()
+            if torchOn {
+                device.torchMode = .off
+                torchOn = false
+            } else {
+                try device.setTorchModeOn(level: 1.0)
+                torchOn = true
+            }
+            device.unlockForConfiguration()
+        } catch {
+            print("Torch error: \(error)")
         }
     }
 
@@ -214,6 +270,95 @@ struct CornerShape: View {
             }
         }
         .frame(width: lineLength, height: lineLength)
+    }
+}
+
+// MARK: - Camera scanner (AVCapture)
+struct CameraScannerView: UIViewRepresentable {
+    let onFound: (String) -> Void
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView(frame: .zero)
+        view.backgroundColor = .black
+
+        let session = AVCaptureSession()
+        session.sessionPreset = .high
+
+        guard let device = AVCaptureDevice.default(for: .video) else {
+            // No camera available (simulator) — show a helpful placeholder
+            let label = UILabel()
+            label.text = "Caméra indisponible — utilisez 'Simuler'"
+            label.textColor = .white
+            label.textAlignment = .center
+            label.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(label)
+            NSLayoutConstraint.activate([
+                label.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                label.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+            ])
+            return view
+        }
+
+        guard let input = try? AVCaptureDeviceInput(device: device) else {
+            return view
+        }
+
+        if session.canAddInput(input) {
+            session.addInput(input)
+        }
+
+        let output = AVCaptureMetadataOutput()
+        if session.canAddOutput(output) {
+            session.addOutput(output)
+            output.setMetadataObjectsDelegate(context.coordinator, queue: DispatchQueue.main)
+            if output.availableMetadataObjectTypes.contains(.qr) {
+                output.metadataObjectTypes = [.qr]
+            }
+        }
+
+        let previewLayer = AVCaptureVideoPreviewLayer(session: session)
+        previewLayer.videoGravity = .resizeAspectFill
+        previewLayer.frame = view.bounds
+        previewLayer.connection?.videoOrientation = .portrait
+        view.layer.addSublayer(previewLayer)
+
+        context.coordinator.previewLayer = previewLayer
+        context.coordinator.session = session
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            session.startRunning()
+        }
+
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.previewLayer?.frame = uiView.bounds
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onFound: onFound)
+    }
+
+    class Coordinator: NSObject, AVCaptureMetadataOutputObjectsDelegate {
+        let onFound: (String) -> Void
+        weak var previewLayer: AVCaptureVideoPreviewLayer?
+        var session: AVCaptureSession?
+
+        init(onFound: @escaping (String) -> Void) {
+            self.onFound = onFound
+        }
+
+        func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
+            guard let first = metadataObjects.first as? AVMetadataMachineReadableCodeObject,
+                  let string = first.stringValue else { return }
+
+            // stop session and report
+            session?.stopRunning()
+            DispatchQueue.main.async {
+                self.onFound(string)
+            }
+        }
     }
 }
 

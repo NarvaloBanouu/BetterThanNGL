@@ -8,14 +8,14 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var isAuthenticated = false
+    @EnvironmentObject var auth: AuthViewModel
 
     var body: some View {
         Group {
-            if isAuthenticated {
+            if auth.isAuthenticated {
                 SessionsListView()
             } else {
-                LoginView(isAuthenticated: $isAuthenticated)
+                LoginView()
             }
         }
     }
@@ -23,4 +23,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+        .environmentObject(AuthViewModel())
 }
